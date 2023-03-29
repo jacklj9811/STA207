@@ -1,0 +1,160 @@
+---
+title: "Discussion8"
+author: "Jing Lyu"
+date: "3/1/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#### Two-way ANOVA with random effects
+
+Consider a balanced design:
+
+$$Y_{ijk} = \mu_{ij} +\epsilon_{ijk}=\mu_{\cdot\cdot} + \alpha_i+\beta_j + (\alpha\beta)_{ij}+\epsilon_{ijk},k=1,\ldots, n, j=1,\ldots, b, i=1,\ldots, a$$
+where $\alpha_i \sim N(0,\sigma_{\alpha}^2)$, $\beta_j \sim N(0,\sigma_{\beta}^2)$, $(\alpha\beta)_{ij} \sim N(0,\sigma^2_{\alpha\beta})$, $\epsilon_{ijk} \sim_{iid} N(0,\sigma^2)$, and all random variables are mutually independent. 
+
+We have the following properties:
+
+1. $\mathbb{E}[Y_{ijk}]=\mu_{\cdot\cdot}$. 
+
+2. ${\rm var}(Y_{ijk})=\sigma_{\alpha}^2+\sigma_{\beta}^2+\sigma_{\alpha\beta}^2+\sigma^2$. 
+
+3. ${\rm cov}(Y_{ijk},Y_{ijk'})=\sigma_{\alpha}^2+\sigma_{\beta}^2+\sigma_{\alpha\beta}^2$ for $k\neq k'$. 
+
+4. ${\rm cov}(Y_{ijk},Y_{ij'k'})=\sigma_{\alpha}^2$ for $j\neq j'$.
+
+5. ${\rm cov}(Y_{ijk},Y_{i'jk'})=\sigma_{\beta}^2$ for $i\neq i'$.
+
+6. ${\rm cov}(Y_{ijk},Y_{i'j'k'})=0$ when no indices are equal.
+
+$\mathbb{E}[{\rm MSA}]=\sigma^2+n\sigma^2_{\alpha\beta}+bn\sigma^2_{\alpha}, \mathbb{E}[{\rm MSB}]=\sigma^2+n\sigma^2_{\alpha\beta}+an\sigma^2_{\beta},\\ \mathbb{E}[{\rm MSAB}]=\sigma^2+n\sigma^2_{\alpha\beta}, \mathbb{E}[{\rm MSE}]=\sigma^2$
+
+then
+
+$\mathbb{E}[{\rm MSAB}]- \mathbb{E}[{\rm MSE}]=n\sigma^2_{\alpha\beta}, \mathbb{E}[{\rm MSA}]-\mathbb{E}[{\rm MSAB}]=bn \sigma_{\alpha}^2, \mathbb{E}[{\rm MSB}]-\mathbb{E}[{\rm MSAB}]=an \sigma_{\beta}^2$.
+
+Test statistics:
+
+![](/Users/jinglyu/Desktop/ucd/2023W/STA207/CourseMaterials/Discussion/Discussion8/table1.jpg)
+For this section, we consider a dataset from online resources. Five employees are randomly selected from a company. Six batches of source material are randomly selected from the production process. The material from each batch was divided into 15 pieces. They were randomized to the different employees such that each employee would have three test specimens from each batch. The response was the corresponding quality score. 
+
+```{r batch}
+book.url <- "https://stat.ethz.ch/~meier/teaching/book-anova"
+quality <- readRDS(url(file.path(book.url, "data/quality.rds")))
+str(quality)
+head(quality)
+with(quality, interaction.plot(x.factor = batch, trace.factor = employee, response = score))
+```
+
+It seems variation exists between employees and between batches. Interaction effect is not obvious. 
+
+##### Model fitting
+
+Consider random main effects and random interaction effect:
+
+```{r two.random, message=F, warning=F}
+library(lme4)
+fit.quality = lmer(score ~ (1 | employee) + (1 | batch) + 
+                      (1 | employee:batch), data = quality)
+summary(fit.quality)
+```
+From the output, we have $\widehat{\sigma_\alpha}^2=1.54$(employee), $\widehat{\sigma_\beta}^2=0.52$(batch), $\widehat{\sigma_{\alpha\beta}}^2=0.02$(interaction), and $\widehat{\sigma}^2=0.23$(error). 
+
+The largest contribution to the total variance is the variance among employees which contributes to $1.54/(1.54+0.52+0.02+0.23)\approx67\%$ of the total variance.
+
+#### Mixed effects model
+
+Consider a balanced design:
+
+$$Y_{ijk}=\mu+\alpha_i+\beta_j+(\alpha\beta)_{ij}+\epsilon_{ijk},k=1,\ldots, n, j=1,\ldots, b, i=1,\ldots, a$$
+where 
+
+$\alpha_i$ is the fixed effect with constraints $\sum\alpha_i=0$.
+
+$\beta_j$ is the random effect following i.i.d. $N(0,\sigma_{\beta}^2)$.
+
+$(\alpha\beta)_{ij}$ is the corresponding random interaction effect with constraints $\sum_i(\alpha\beta)_{ij}=0$ for any $j$. $(\alpha\beta)_{ij}\sim N(0,(1-1/a)\sigma^2_{\alpha\beta})$, ${\rm cov}( (\alpha\beta)_{ij},  (\alpha\beta)_{i'j})= -\sigma^2_{\alpha\beta}/a$, ${\rm cov}( (\alpha\beta)_{ij},  (\alpha\beta)_{i'j'})=0$,  if $i\neq i'$ and $j\neq j'$. 
+
+$\{\epsilon_{ijk}\}$ are i.i.d. $N(0,\sigma^2)$. $\{ \beta_j\}$, $\{(\alpha\beta)_{ij}\}$, $\{\epsilon_{ijk} \}$ are mutually independent. 
+
+We have the following properties:
+
+1. $\mathbb{E}[Y_{ijk}]=\mu_{\cdot\cdot}+\alpha_i$ 
+
+2. ${\rm var}(Y_{ijk})=\sigma_{\beta}^2+(1-1/a)\sigma_{\alpha\beta}^2+\sigma^2$.
+
+3. ${\rm cov}(Y_{ijk},Y_{ijk'})=\sigma_{\beta}^2+(1-1/a)\sigma_{\alpha\beta}^2$ for $k\neq k'$. 
+
+4. ${\rm cov}(Y_{ijk},Y_{ij'k'})=0$ for $j\neq j'$.
+
+5. ${\rm cov}(Y_{ijk},Y_{i'jk'})=\sigma_{\beta}^2-\sigma_{\alpha\beta}^2/a$ for $i\neq i'$.
+
+6. ${\rm cov}(Y_{ijk},Y_{i'j'k'})=0$ when no indices are equal.
+
+$\mathbb{E}[{\rm MSA}]=\sigma^2+nb\frac{\sum\alpha_i^2}{a-1}+n\sigma^2_{\alpha\beta}, \mathbb{E}[{\rm MSB}]=\sigma^2+an\sigma^2_{\beta}, \\ \mathbb{E}[{\rm MSAB}]=\sigma^2+n\sigma^2_{\alpha\beta}, \mathbb{E}[{\rm MSE}]=\sigma^2$
+
+then
+
+$\mathbb{E}[{\rm MSAB}]- \mathbb{E}[{\rm MSE}]=n\sigma^2_{\alpha\beta}, \mathbb{E}[{\rm MSA}]-\mathbb{E}[{\rm MSAB}]=nb\frac{\sum\alpha_i^2}{a-1},  \mathbb{E}[{\rm MSB}]-\mathbb{E}[{\rm MSE}]=an \sigma_{\beta}^2$
+
+Test statistics:
+
+![](/Users/jinglyu/Desktop/ucd/2023W/STA207/CourseMaterials/Discussion/Discussion8/table2.jpg)
+
+For this section, we use `Machines` dataset from `nlme` package. It contains experiment results of three brands of machines. Six workers were randomly chosen among the employees of a factory to operate each machine three times. Productivity score is considered as the response variable.
+
+```{r mixed}
+data("Machines", package = "nlme")
+class(Machines) <- "data.frame"
+Machines[, "Worker"] <- factor(Machines[, "Worker"], levels = 1:6, 
+                               ordered = FALSE)
+str(Machines, give.attr = FALSE) ## give.attr to shorten output
+```
+
+##### Visualization
+
+We use the mean of scores for each combination of worker and machine to visualize the data.
+
+```{r visual}
+library(ggplot2)
+ggplot(Machines, aes(x = Machine, y = score, group = Worker, col = Worker)) + 
+  geom_point() + stat_summary(fun = mean, geom = "line") + theme_bw()
+```
+
+We can see the difference of scores among machines. Machine C has the largest productivity in general. We can also observe different profiles across workers. Most workers show similar profiles except that worker 6 performs badly on machine B. 
+
+Suppose the interest is to study the specific machines, then machine is regarded as a fixed effect. Each worker is randomly selected from the factory and has its own random deviation. We use mixed effects model to make inference.
+
+##### Model fitting
+
+```{r mix, message=F, warning=F}
+fit.machines <- lmer(score ~ Machine + (1 | Worker) + 
+                       (1 | Worker:Machine), data = Machines)
+anova(fit.machines)
+```
+`lme4` does not calculate p-values for the fixed effects, so the package `lmerTest` was used instead.
+
+`contr.treatment` contrasts each level with the baseline level (reference group).
+
+`contr.poly` returns contrasts based on orthogonal polynomials. 
+
+```{r lmerTest}
+options(contrasts = c("contr.treatment", "contr.poly"))
+#library(lmerTest)
+fit.machines <- lmerTest::lmer(score ~ Machine + (1 | Worker) + 
+                       (1 | Worker:Machine), data = Machines)
+anova(fit.machines)
+```
+
+The fixed effect of machine is significant.
+
+```{r summary}
+summary(fit.machines)
+```
+Machine A is considered as the reference gorup. The productivity score on machine B is on average 7.97 units larger than on machine A.
+
+### References
+
+https://stat.ethz.ch/~meier/teaching/anova/random-and-mixed-effects-models.html#eq:cell-means-random
