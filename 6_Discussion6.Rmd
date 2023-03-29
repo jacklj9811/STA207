@@ -1,0 +1,201 @@
+---
+title: "Discussion6"
+author: "Jing Lyu"
+date: "2/15/2023"
+output: html_document
+bibliography: references.bib 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Two-way ANOVA with fixed effects
+
+In this section, we’ll use the built-in R data set 'ToothGrowth'. It includes information from a study on the effects of vitamin C on tooth growth in Guinea pigs.
+
+The trial used 60 pigs who were given one of three vitamin C dose levels (0.5, 1, or 2 mg/day) via one of two administration routes: orange juice (OJ) or ascorbic acid (VC).
+
+```{r tooth, message=F, warning=F}
+library(dplyr)
+dat = ToothGrowth
+str(dat)
+```
+
+R treats 'dose' as a numeric variable based on the output. We’ll transform it to a factor variable.
+
+```{r trans}
+dat$dose <- factor(dat$dose,
+                  levels = c(0.5, 1, 2),
+                  labels = c("D0.5", "D1", "D2"))
+table(dat$supp,dat$dose)
+```
+
+We have a well-balanced design.
+
+### Main effects plots and the interaction plot
+
+```{r plots, message=F, warning=F}
+library(gplots)
+par(mfrow=c(1,3))
+plotmeans(len~supp,data=dat,xlab="Supplement",ylab="Tooth Length", main="Main effect, Supplement") 
+plotmeans(len~dose,data=dat,xlab="Dose",ylab="Tooth Length", main="Main effect, Dose") 
+dose=dat$dose
+supp=dat$supp
+len=dat$len
+interaction.plot(supp,dose,len,xlab="Supplement",ylab="Tooth Length", main="Interaction")
+par(mfrow=c(1,1))
+```
+There seems to be some interaction effects.
+
+#### Modeling
+
+```{r aov2}
+model2 <- aov(len ~ supp * dose, data = dat)
+summary(model2)
+```
+
+The interaction has p-value smaller than 0.05, indicating the relationship between dose and tooth length is significantly influenced by the supplement technique (or you can say the relationship between supplement technique and tooth length is influenced by the dose).
+
+The most important factor variable is `dose`. We can conclude that modifying the delivery technique (supp) or the vitamin C dose will have a major impact on the mean tooth length.
+
+### Multiple pairwise comparisons
+
+Significant p-values in an ANOVA test shows that some of the group means differ, but we don’t know which pairs of groups have different means.
+
+We may want to explore what the best combination of supplement and dose is, or whether such combination exists. The "best combination" represents the cell with the highest cell mean compared to other cells. To do all pairwise comparisons, we need Tukey-Kramer method.
+
+* Tukey's method
+
+```{r Tukey}
+T.ci=TukeyHSD(model2,conf.level = 0.95)
+par(mfrow=c(2,2))
+plot(T.ci, las=1 , col="brown")
+```
+
+Simultaneous confidence intervals of factor `dose`:
+
+```{r Tukey.dose}
+# Only show all pairwise comparisons in factor dose
+TukeyHSD(model2, which = "dose")
+```
+
+The output shows that all pairwise comparisons in factor `dose` with an adjusted p-value of 0.05 are significant.
+
+To find the best combination, we only need to focus on the differences of the two largest means.
+
+```{r two}
+idx=list();
+idx[[1]]=dat$supp;idx[[2]]=dat$dose;
+(means.comb=tapply(dat$len, INDEX=idx,mean))
+```
+
+From this table, the two cells are (OJ,D2) and (VC,D2).
+
+Then, let's find the confidence interval corresponding to the difference between (OJ,D2) and (VC,D2).
+
+```{r best.comb}
+T.ci[['supp:dose']]['VC:D2-OJ:D2',]
+```
+Since the p-value is not significant, we can conclude there is no enough evidence of distinguishing (OJ,D2) and (VC,D2). We can not decide which one is the best combination.
+
+### Diagnostics
+
+```{r diag}
+par(mfrow=c(2,2))
+plot(model2)
+```
+
+It seems points 32, 23 and 49 are outliers, which can have a significant impact on normality and variance homogeneity. It may be beneficial to remove outliers.
+
+Check the homogeneity of variances with Levene’s test:
+
+```{r levene, message=F, warning=F}
+library(car)
+leveneTest(len ~ supp*dose, data = dat)
+```
+
+Assuming significance level is 0.05, we can infer that the variations in the different treatment groups are homogeneous.
+
+Check the normality with Shapiro-Wilk test:
+
+```{r shaprio}
+model2.residuals = residuals(model2)
+shapiro.test(model2.residuals)
+```
+
+Normality assumption is satisfied.
+
+### Type I, II and III ANOVA
+
+There are three methods for splitting the total variation of a dependent variable: Type I, Type II and Type III Sums of Squares. They do not give the same result in case of unbalanced data.
+
+Suppose the model has two independent variables A and B.
+
+1. Type I ANOVA
+
+Type I Sums of Squares are Sequential, so the order of variables in the models makes a difference. Sums of Squares are Mathematically defined as:
+
+* SS(A) for independent variable A
+
+* SS(B|A) for independent variable B
+
+* SS(AB|A,B) for interaction effect
+
+2. Type II ANOVA 
+
+Type II Sums of Squares are not sequential. It should be used if there is no interaction effect. Sums of Squares are Mathematically defined as:
+
+* SS(A | B) for independent variable A
+
+* SS(B | A) for independent variable B
+
+3. Type III ANOVA
+
+Type III Sums of Squares are not sequential. It's also called partial sums of squares. Sums of Squares are Mathematically defined as:
+
+* SS(A | B, AB) for independent variable A
+
+* SS(B | A, AB) for independent variable B
+
+#### Example:
+
+For this section, we use `Wage` dataset. We are interested in investigating the relationship between wages and two demographic factors: ethnicity and occupation.
+
+It is an unbalanced design.
+
+```{r wage}
+wage = read.csv('/Users/jinglyu/Desktop/ucd/2023W/STA207/CourseMaterials/Discussion/Discussion6/Wage.csv')
+wage$ethnicity = as.factor(wage$ethnicity)
+wage$occupation = as.factor(wage$occupation)
+table(wage$ethnicity, wage$occupation)
+```
+
+`aov` performs type I ANOVA. Different orders generate different test results for the main effects. But the inference for the interaction term is the same. It appears the interaction effects are not significant.
+
+```{r type1}
+fit1 = aov(wage ~ ethnicity + occupation + ethnicity:occupation, data=wage)
+summary(fit1)
+fit2 = aov(wage ~ occupation + ethnicity + ethnicity:occupation, data=wage)
+summary(fit2)
+```
+Type I ANOVA is rarely what we want in practice. The variable is considered as the most important is just because it was specified first in the model.
+
+`Anova` function from `car` package can generate type II and III ANOVA.
+
+```{r type2, warning=F, message=F}
+Anova(lm(wage ~ ethnicity + occupation, data=wage), type = 'II')
+Anova(lm(wage ~ 0 + ethnicity * occupation, data=wage), type = 'III')
+```
+Another way to test interaction term:
+
+```{r anova}
+full.model = aov(wage ~ ethnicity * occupation, data=wage)
+reduced.model = aov(wage ~ ethnicity +  occupation, data=wage)
+anova(reduced.model, full.model)         
+```
+
+
+I would suggest to test for the interaction term first (SS(AB|A,B)) and only if the interaction is not significant, continue with the analysis for main effects.
+
+If there is indeed no interaction, then type II is statistically more powerful than type III.

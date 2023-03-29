@@ -1,0 +1,96 @@
+---
+title: "Discussion5"
+author: "Jing Lyu"
+date: "2/8/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Two-way ANOVA
+
+In this section, we’ll use the built-in R data set 'ToothGrowth'. It includes information from a study on the effects of vitamin C on tooth growth in Guinea pigs.
+
+The trial used 60 pigs who were given one of three vitamin C dose levels (0.5, 1, or 2 mg/day) via one of two administration routes: orange juice (OJ) or ascorbic acid (VC).
+
+#### Visualization
+
+```{r tooth, message=F, warning=F}
+library(dplyr)
+dat = ToothGrowth
+str(dat)
+table(dat$dose)
+```
+R treats 'dose' as a numeric variable based on the output. We’ll transform it to a factor variable.
+
+```{r trans}
+dat$dose <- factor(dat$dose,
+                  levels = c(0.5, 1, 2),
+                  labels = c("D0.5", "D1", "D2"))
+table(dat$supp,dat$dose)
+```
+
+We have a well-balanced design.
+
+To visualize the data grouped by the levels of the two factors, we can use a box plot.
+
+```{r boxplot}
+boxplot(len ~ supp * dose, data=dat, frame = FALSE,
+        col = c("#00AFBB", "#E7B800"), ylab="Tooth Length")
+```
+
+#### Modeling
+
+```{r aov}
+model1 = aov(len ~ supp + dose, data = dat)
+summary(model1)
+# If you think these two variables have interactive effect:
+model2 <- aov(len ~ supp * dose, data = dat)
+summary(model2)
+```
+
+### Practice Project
+
+#### Import dataset
+
+* Harvard dataverse
+
+```{r Harvard,message=F,warning=F}
+#install.packages("haven")
+#install.packages("tzdb")
+library(haven) # readin sav file
+star = read_sav("/Users/jinglyu/Desktop/ucd/2023W/STA207/CourseMaterials/Projects/STAR_Students.sav")%>%as.data.frame()
+length(names(star)) # 379 variables
+# check missing values
+star.dat = star%>%dplyr::select(g1tmathss, g1classtype, g1schid, g1tchid)%>%mutate(na.count=rowSums(is.na(.))) 
+table(star.dat$na.count)
+star.temp1 = star.dat%>%filter(na.count==1)
+head(star.temp1) # only missing math scores
+star.dat = star.dat%>%na.omit()%>%dplyr::select(-na.count) # drop rows with missing data
+head(star.dat)
+str(star.dat)
+star.dat$g1classtype = as.factor(star.dat$g1classtype)
+star.dat$g1schid = as.factor(star.dat$g1schid)
+star.dat$g1tchid = as.factor(star.dat$g1tchid)
+# summarize mean scores by class types, teachers and schools
+star.dat1 = star.dat%>%group_by(g1classtype,g1schid,g1tchid)%>%
+  dplyr::summarise(math.mean=mean(g1tmathss))
+head(star.dat1)
+```
+
+* AER package
+
+```{r AER, message=F, warning=F}
+#install.packages('AER')
+library(AER)
+library(dplyr)
+data("STAR")
+sapply(STAR,class)
+dim(STAR)
+# only keep 1st grade
+STAR.dat = STAR%>%dplyr::select(math1, school1, experience1, tethnicity1, schoolid1, star1)%>% 
+  na.omit() # remove rows with NA value in any column
+str(STAR.dat)
+```
